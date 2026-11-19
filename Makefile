@@ -14,9 +14,9 @@ TB_SRCS  = tb/riscv_core_tb.sv
 
 all: sim
 
-sim: obj_dir/sim
+sim: obj_dir/Vriscv_core_tb
 
-obj_dir/sim: $(RTL_SRCS) $(TB_SRCS)
+obj_dir/Vriscv_core_tb: $(RTL_SRCS) $(TB_SRCS)
 	mkdir -p verif/logs
 	verilator --sv --cc --exe --main --timing \
 	  --top-module riscv_core_tb \
@@ -24,9 +24,9 @@ obj_dir/sim: $(RTL_SRCS) $(TB_SRCS)
 	  $(RTL_SRCS) $(TB_SRCS)
 	make -C obj_dir -f Vriscv_core_tb.mk
 
-run: obj_dir/sim
+run: obj_dir/Vriscv_core_tb
 	mkdir -p verif/logs
-	cd $(CURDIR) && obj_dir/sim
+	cd $(CURDIR) && obj_dir/Vriscv_core_tb
 
 clean:
 	rm -rf obj_dir verif/logs/dut.log

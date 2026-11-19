@@ -37,6 +37,7 @@ def gen_test(test_name: str, outdir: Path, iterations: int = 1) -> list[Path]:
         f"--isa rv32i "
         f"--mabi ilp32 "
         f"--simulator pyflow "
+        f"--target rv32i "
         f"--output {wsl_outdir} "
         f"--iterations {iterations}"
     ]

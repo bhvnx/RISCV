@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 run_spike.py
 Runs Spike on a compiled ELF and produces a parsed commit log.

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 compare_logs.py
 Compares Spike's golden commit log against the DUT's commit log.

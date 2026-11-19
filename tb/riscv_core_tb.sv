@@ -1,6 +1,6 @@
 // Functional verification testbench for riscv_core.
 //
-// Instructions are loaded from sw/test_basic.hex via $readmemh in instr_mem.
+// Instructions are loaded from sw/instr_mem.hex via $readmemh in instr_mem.
 // See sw/test_basic.s for the program listing.
 
 module riscv_core_tb;

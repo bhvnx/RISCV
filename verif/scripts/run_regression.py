@@ -12,6 +12,7 @@ Usage:
     # Run N random iterations
     python3 run_regression.py --test riscv_arithmetic_basic_test --iterations 5
 """
+from __future__ import annotations
 import argparse, subprocess, sys, shutil, json
 from pathlib import Path
 
@@ -35,6 +36,10 @@ TB_SRC = [
 ]
 
 def wsl_path(win_path: Path) -> str:
+    # Already inside WSL — path is already a Linux path
+    import platform
+    if platform.system() == "Linux":
+        return str(win_path)
     r = subprocess.run(["wsl", "wslpath", str(win_path)],
                        capture_output=True, text=True)
     return r.stdout.strip()
@@ -54,14 +59,16 @@ def compile_asm(src: Path, outdir: Path):
     return compile_test(src, outdir)
 
 def run_spike(elf: Path, outdir: Path) -> list[dict]:
-    """Run Spike in WSL and return parsed commit log."""
+    """Run Spike and return parsed commit log."""
+    import platform
     wsl_elf    = wsl_path(elf)
     wsl_out    = wsl_path(outdir)
     wsl_script = wsl_path(SCRIPTS / "run_spike.py")
-    r = subprocess.run(
-        ["wsl", "python3", wsl_script, wsl_elf, "--outdir", wsl_out],
-        capture_output=True, text=True
-    )
+    if platform.system() == "Linux":
+        cmd = ["python3", wsl_script, wsl_elf, "--outdir", wsl_out]
+    else:
+        cmd = ["wsl", "python3", wsl_script, wsl_elf, "--outdir", wsl_out]
+    r = subprocess.run(cmd, capture_output=True, text=True)
     print(r.stdout)
     if r.returncode != 0:
         print(f"[ERROR] Spike failed:\n{r.stderr}", file=sys.stderr)
@@ -69,17 +76,20 @@ def run_spike(elf: Path, outdir: Path) -> list[dict]:
     return json.loads((outdir / "spike_parsed.json").read_text())
 
 def run_simulation(test_name: str, hex_path: Path, outdir: Path):
-    """Compile and run the iverilog testbench."""
+    """Compile and run the Verilator testbench."""
     SIM_DIR.mkdir(exist_ok=True)
-    shutil.copy(hex_path, SIM_DIR / "instr_mem.hex")
+    shutil.copy(hex_path, ROOT / "sw" / "instr_mem.hex")
 
-    sim_bin = outdir / "sim.vvp"
-    print(f"[sim] compiling testbench ...")
-    run(["iverilog", "-g2012", "-o", str(sim_bin)] + TB_SRC)
+    obj_dir = ROOT / "obj_dir"
+    print(f"[sim] compiling testbench with Verilator ...")
+    run(["verilator", "--sv", "--cc", "--exe", "--main", "--timing",
+         "--top-module", "riscv_core_tb",
+         "--Mdir", str(obj_dir)] + TB_SRC)
+    run(["make", "-C", str(obj_dir), "-f", "Vriscv_core_tb.mk"])
 
     print(f"[sim] running simulation ...")
-    r = subprocess.run(["vvp", str(sim_bin)], capture_output=True, text=True,
-                       cwd=str(ROOT))
+    r = subprocess.run([str(obj_dir / "Vriscv_core_tb")],
+                       capture_output=True, text=True, cwd=str(ROOT))
     print(r.stdout)
     if r.returncode != 0:
         print(f"[sim] stderr: {r.stderr}", file=sys.stderr)

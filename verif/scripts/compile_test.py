@@ -16,7 +16,7 @@ OBJCOPY = "riscv64-unknown-elf-objcopy"
 
 LINK_SCRIPT = """\
 SECTIONS {
-    . = 0x00000000;
+    . = 0x80000000;
     .text : { *(.text) }
 }
 """
@@ -38,11 +38,14 @@ def compile_test(src: Path, outdir: Path):
 
     ldscr.write_text(LINK_SCRIPT)
 
+    RISCV_DV_USER_EXT = Path.home() / "riscv-dv" / "user_extension"
+
     print(f"[compile] assembling {src.name} ...")
-    run([AS, "-march=rv32i", "-mabi=ilp32", str(src), "-o", str(obj)])
+    run([AS, "-march=rv32i_zicsr", "-mabi=ilp32",
+         f"-I{RISCV_DV_USER_EXT}", str(src), "-o", str(obj)])
 
     print(f"[compile] linking ...")
-    run([LD, "-T", str(ldscr), str(obj), "-o", str(elf)])
+    run([LD, "-m", "elf32lriscv", "-T", str(ldscr), str(obj), "-o", str(elf)])
 
     print(f"[compile] generating {hexf.name} ...")
     run([OBJCOPY, "-O", "verilog", "--verilog-data-width=4", str(elf), str(hexf)])

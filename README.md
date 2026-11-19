@@ -84,9 +84,9 @@ All RV32I base integer instructions:
 
 ## Verification
 
-The verification strategy compares the DUT's execution trace against **Spike**, the official RISC-V ISA simulator, instruction by instruction. Both sides produce a **commit log** — one line per retired instruction recording PC, encoding, destination register, and written value.
+The verification strategy is **ISS co-simulation**: the same test program runs on both the RTL (via Verilator) and **Spike** (the official RISC-V ISA reference simulator). Both produce a **commit log** — one line per retired instruction recording PC, encoding, destination register, and written value — which are then compared instruction-by-instruction.
 
-Currently the test programs are **directed** (hand-written assembly). The planned next step is to integrate **riscv-dv** as a constrained-random front end — it auto-generates thousands of legal RV32I programs which feed into the same GCC → Spike → DUT → compare pipeline below.
+Currently the test programs are **directed** (hand-written assembly). The planned next step is to integrate **riscv-dv** as a constrained-random front end — it auto-generates thousands of legal RV32I programs which feed into the same GCC → Spike → DUT → compare pipeline below. The scripts for this (`gen_test.py`, `compile_test.py`, `run_regression.py`) are in place and in progress.
 
 ### Verification Flow
 
@@ -96,14 +96,14 @@ Currently the test programs are **directed** (hand-written assembly). The planne
        ▼  (currently: hand-written)
   sw/test_basic.s
         │
-        │  riscv-none-elf-as + ld  (links at 0x80000000)
+        │  riscv64-unknown-elf-as + ld  (links at 0x80000000)
         ▼
   sw/test_basic.elf ──────────────────────────────────────▶ Spike (ISA sim)
         │                                                          │
         │  objcopy -O verilog                              --log-commits
         │  --change-address -0x80000000                           │
         ▼                                                          ▼
-  sw/test_basic.hex                                  verif/logs/spike_parsed.json
+  sw/instr_mem.hex                                   verif/logs/spike_parsed.json
   (@00000000 normalized)                             (golden commit log)
         │                                                          │
         │  $readmemh → instr_mem                                   │
@@ -122,12 +122,13 @@ Currently the test programs are **directed** (hand-written assembly). The planne
 
 | Tool                            | Role                                                           |
 |---------------------------------|----------------------------------------------------------------|
-| `riscv-none-elf-as` / `ld`      | Assembles and links test programs to ELF at `0x80000000`      |
-| `riscv-none-elf-objcopy`        | Converts ELF → Verilog hex for `$readmemh`                    |
-| **Spike** (`riscv-isa-sim`)     | Official RISC-V golden reference; generates expected results   |
+| `riscv64-unknown-elf-as` / `ld` | Assembles and links test programs to ELF at `0x80000000`      |
+| `riscv64-unknown-elf-objcopy`   | Converts ELF → Verilog hex for `$readmemh`                    |
+| **Spike** (`riscv-isa-sim`)     | Official RISC-V ISA reference; produces golden commit log      |
 | **Verilator 5**                 | Compiles RTL to a cycle-accurate C++ simulation                |
-| `verif/scripts/run_spike.py`    | Runs Spike, parses `--log-commits` output to JSON             |
+| `verif/scripts/run_spike.py`    | Runs Spike, parses `--log-commits` output to JSON              |
 | `verif/scripts/compare_logs.py` | Diffs DUT log against Spike JSON line-by-line                  |
+| `verif/scripts/run_regression.py` | *(in progress)* Orchestrates full riscv-dv → sim → compare flow |
 
 ### Commit Log Format
 
@@ -144,14 +145,14 @@ Spike produces the same fields; `compare_logs.py` checks PC, instruction encodin
 ### Running a Test
 
 ```bash
-# 1.  Compile the test program (PowerShell, from sw/)
-.\build.ps1 test_basic
+# 1.  Compile the test program (WSL, from sw/)
+riscv64-unknown-elf-as -march=rv32i -mabi=ilp32 test_basic.s -o test_basic.o
+riscv64-unknown-elf-ld -m elf32lriscv -T link.ld test_basic.o -o test_basic.elf
+riscv64-unknown-elf-objcopy -O verilog --verilog-data-width=4 \
+  --change-address -0x80000000 test_basic.elf instr_mem.hex
 
-# 2.  Simulate the DUT (WSL, from project root)
-verilator --sv --cc --exe --main --timing --top-module riscv_core_tb \
-  --Mdir obj_dir rtl/*.sv tb/riscv_core_tb.sv
-make -C obj_dir -f Vriscv_core_tb.mk
-./obj_dir/Vriscv_core_tb          # writes verif/logs/dut.log
+# 2.  Build and simulate the DUT (from project root)
+make run                          # writes verif/logs/dut.log
 
 # 3.  Run Spike reference
 python3 verif/scripts/run_spike.py sw/test_basic.elf --outdir verif/logs
@@ -191,14 +192,16 @@ RISCV/
 ├── sw/             Test programs
 │   ├── test_basic.s
 │   ├── test_basic.elf
-│   ├── test_basic.hex
+│   ├── instr_mem.hex       ← loaded by instr_mem.sv at sim start
 │   ├── link.ld
 │   └── build.ps1
 ├── verif/
 │   ├── scripts/
-│   │   ├── run_spike.py
-│   │   ├── compare_logs.py
-│   │   └── run_regression.py
+│   │   ├── run_spike.py        ← runs Spike, parses commit log
+│   │   ├── compare_logs.py     ← diffs DUT vs Spike
+│   │   ├── gen_test.py         ← (planned) invokes riscv-dv
+│   │   ├── compile_test.py     ← (planned) .S → ELF + hex
+│   │   └── run_regression.py   ← (planned) orchestrates full flow
 │   └── logs/
 │       ├── dut.log
 │       ├── spike_parsed.json

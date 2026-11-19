@@ -5,7 +5,7 @@
 
 module instr_mem #(
   parameter            DepthWords = 256,
-  parameter string     HEX_FILE   = "sw/test_basic.hex"
+  parameter string     HEX_FILE   = "sw/instr_mem.hex"
 ) (
   input  logic [31:0] pc_i,
   output logic [31:0] instr_o
