@@ -1,0 +1,8 @@
+# Regression test plan.
+# Each entry names a riscv-dv test and how many random seeds to generate.
+# Run `make gen` to generate all listed tests into verif/logs/.
+# Run `make regress` to simulate and compare them against Spike.
+
+tests:
+  - name: riscv_arithmetic_basic_test
+    iterations: 1

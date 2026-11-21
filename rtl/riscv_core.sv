@@ -3,9 +3,18 @@
 
 module riscv_core
   import riscv_pkg::*;
+#(
+  parameter string HEX_FILE = "sw/instr_mem.hex"
+)
 (
-  input logic clk_i,
-  input logic rst_ni
+  input  logic        clk_i,
+  input  logic        rst_ni,
+  // Debug outputs — connect in fpga_top for ILA/LED/UART; leave unconnected in sim
+  output logic [31:0] dbg_pc_o,
+  output logic [31:0] dbg_instr_o,
+  output logic        dbg_reg_wr_o,
+  output logic [4:0]  dbg_rd_addr_o,
+  output logic [31:0] dbg_wb_data_o
 );
 
   ////////
@@ -114,7 +123,7 @@ module riscv_core
     .pc_plus_4_o(pc_plus4)
   );
 
-  instr_mem u_instr_mem (
+  instr_mem #(.HEX_FILE(HEX_FILE)) u_instr_mem (
     .pc_i   (pc_q),
     .instr_o(instr)
   );
@@ -169,5 +178,12 @@ module riscv_core
     .wr_data_i(rs2_data),
     .rd_data_o(mem_rd_data)
   );
+
+  // Debug port aliases (combinational, zero overhead)
+  assign dbg_pc_o      = pc_q;
+  assign dbg_instr_o   = instr;
+  assign dbg_reg_wr_o  = reg_wr_en;
+  assign dbg_rd_addr_o = rd_addr;
+  assign dbg_wb_data_o = wb_data;
 
 endmodule : riscv_core

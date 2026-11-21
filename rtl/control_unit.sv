@@ -156,6 +156,17 @@ module control_unit
         reg_wr_en_o = 1'b1;
       end
 
+      // SYSTEM: CSR instructions return 0 for all CSR reads (funct3 != 0).
+      // funct3 == 0 is ECALL/EBREAK — no register write, used as halt sentinel.
+      7'b1110011: begin
+        if (funct3 != 3'b000) begin
+          op_a_src_o  = OpAZero;
+          alu_op_o    = AluAnd;    // 0 & anything = 0
+          alu_src_b_o = 1'b0;
+          reg_wr_en_o = 1'b1;
+        end
+      end
+
       default: ;  // Undefined opcode: hold safe defaults, no side effects.
 
     endcase

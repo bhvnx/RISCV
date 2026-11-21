@@ -12,7 +12,8 @@ Available test names (RV32I relevant):
     riscv_jump_stress_test        -- heavy JAL/JALR/branch sequences
     riscv_loop_test               -- loops with branches
 """
-import argparse, subprocess, sys, os
+from __future__ import annotations
+import argparse, subprocess, sys, os, platform
 from pathlib import Path
 
 # Paths inside WSL
@@ -20,19 +21,22 @@ RISCV_DV_DIR = "~/riscv-dv"
 VENV_PYTHON  = "~/riscv-dv/.venv/bin/python3"
 
 def to_wsl(win_path: Path) -> str:
+    """Return a WSL-usable path. When already on Linux the path is unchanged."""
+    if platform.system() == "Linux":
+        return str(win_path)
     r = subprocess.run(["wsl", "wslpath", str(win_path)],
                        capture_output=True, text=True)
     return r.stdout.strip()
 
 def gen_test(test_name: str, outdir: Path, iterations: int = 1) -> list[Path]:
     outdir.mkdir(parents=True, exist_ok=True)
-    wsl_outdir = to_wsl(outdir)
+    wsl_outdir = to_wsl(outdir.resolve())
 
     print(f"[riscv-dv] generating {iterations}x {test_name} ...")
-    cmd = [
-        "wsl", "bash", "-c",
+    inner = (
+        f"export PATH={RISCV_DV_DIR}/.venv/bin:$PATH && "
         f"cd {RISCV_DV_DIR} && "
-        f"{VENV_PYTHON} run.py "
+        f"python3 run.py "
         f"--test {test_name} "
         f"--isa rv32i "
         f"--mabi ilp32 "
@@ -40,12 +44,16 @@ def gen_test(test_name: str, outdir: Path, iterations: int = 1) -> list[Path]:
         f"--target rv32i "
         f"--output {wsl_outdir} "
         f"--iterations {iterations}"
-    ]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        print(f"[riscv-dv] STDOUT:\n{r.stdout}", file=sys.stderr)
-        print(f"[riscv-dv] STDERR:\n{r.stderr}", file=sys.stderr)
-        sys.exit(1)
+    )
+    # When running from Windows use `wsl bash -c`; inside WSL use bash directly.
+    if platform.system() == "Linux":
+        cmd = ["bash", "-c", inner]
+    else:
+        cmd = ["wsl", "bash", "-c", inner]
+    # Stream output directly to terminal — capturing causes pipe-buffer deadlock.
+    # riscv-dv exits non-zero when RISCV_GCC is unset (compilation step fails),
+    # but the .S files are already written before that — check for them directly.
+    subprocess.run(cmd)
 
     # riscv-dv writes .S files to <outdir>/asm_test/
     asm_dir = outdir / "asm_test"
