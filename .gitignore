@@ -40,3 +40,14 @@ Thumbs.db
 *.swo
 *~
 .vscode/settings.json
+
+# ── Vivado project build artefacts ────────────────────────
+# Keep: vivado/*.tcl, riscv_core.xpr, and impl_1/fpga_top.bit
+vivado/riscv_core_proj/riscv_core.cache/
+vivado/riscv_core_proj/riscv_core.hw/
+vivado/riscv_core_proj/riscv_core.ip_user_files/
+vivado/riscv_core_proj/riscv_core.sim/
+vivado/riscv_core_proj/riscv_core.runs/.jobs/
+vivado/riscv_core_proj/riscv_core.runs/synth_1/
+vivado/riscv_core_proj/riscv_core.runs/impl_1/*
+!vivado/riscv_core_proj/riscv_core.runs/impl_1/fpga_top.bit
